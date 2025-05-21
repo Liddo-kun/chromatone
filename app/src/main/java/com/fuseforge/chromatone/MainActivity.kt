@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -150,6 +151,8 @@ fun MainScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     val remainingSeconds by viewModel.remainingSeconds.observeAsState(null)
     val context = LocalContext.current
 
+    var showInfoDialog by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         viewModel.setAppContext(context)
     }
@@ -237,6 +240,39 @@ fun MainScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                     modifier = Modifier.fillMaxWidth()
                 )
             }
+        }
+
+        // Info button (top right)
+        IconButton(
+            onClick = { showInfoDialog = true },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(24.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Info,
+                contentDescription = "Info",
+                tint = Color.Black.copy(alpha = 0.7f)
+            )
+        }
+
+        // Info dialog
+        if (showInfoDialog) {
+            AlertDialog(
+                onDismissRequest = { showInfoDialog = false },
+                title = { Text("About ChromaTone") },
+                text = {
+                    Text(
+                        "ChromaTone\n\nA privacy-first, minimal noise utility. No data collection. No tracking. No network calls.\n\nVersion 1.0.0",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { showInfoDialog = false }) {
+                        Text("OK")
+                    }
+                }
+            )
         }
     }
 }
