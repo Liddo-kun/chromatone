@@ -15,3 +15,7 @@
 local.properties
 PLAY_STORE_LISTING.md
 PRIVACY_POLICY.md
+
+# Ignore design and development principles docs
+DESIGN_PRINCIPLES.md
+DEVELOPMENT_PRINCIPLES.md
