@@ -21,13 +21,11 @@ class NoiseForegroundService : Service() {
         const val ACTION_PAUSE = "com.fuseforge.chromatone.PAUSE"
         const val ACTION_STOP = "com.fuseforge.chromatone.STOP"
         const val EXTRA_NOISE_TYPE = "noise_type"
-        const val EXTRA_VOLUME = "volume"
     }
 
     private var noisePlayer: NoisePlayer? = null
     private var isPlaying = false
     private var currentNoiseType: NoiseType = NoiseType.White
-    private var currentVolume: Float = 0.7f
 
     override fun onCreate() {
         super.onCreate()
@@ -35,11 +33,10 @@ class NoiseForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Get extras for noise type and volume if present
+        // Get extras for noise type if present
         intent?.getStringExtra(EXTRA_NOISE_TYPE)?.let {
             currentNoiseType = NoiseType.valueOf(it)
         }
-        currentVolume = intent?.getFloatExtra(EXTRA_VOLUME, 0.7f) ?: currentVolume
 
         when (intent?.action) {
             ACTION_PLAY -> handlePlay()
@@ -56,8 +53,7 @@ class NoiseForegroundService : Service() {
     private fun handlePlay() {
         noisePlayer?.stop()
         noisePlayer = NoisePlayer(
-            bufferProvider = { bufferSize -> NoiseGenerator.getNoiseBuffer(currentNoiseType, bufferSize) },
-            volume = currentVolume
+            bufferProvider = { bufferSize -> NoiseGenerator.getNoiseBuffer(currentNoiseType, bufferSize) }
         )
         noisePlayer?.start()
         isPlaying = true
@@ -137,4 +133,4 @@ class NoiseForegroundService : Service() {
         noisePlayer = null
         super.onDestroy()
     }
-} 
+}

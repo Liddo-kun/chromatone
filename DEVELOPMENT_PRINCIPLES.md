@@ -64,6 +64,7 @@ com.fuseforge.chromatone/
 - ProGuard optimization
 - APK size monitoring
 - Performance profiling
+- Requires Java 17
 
 ## Debugging & Error Handling
 - Function independently and ask questions only if you are not able to make a decision. Use the user as a resource for better decisions, not for step-by-step approval.

@@ -5,7 +5,7 @@ import android.media.AudioManager
 import android.media.AudioTrack
 import kotlin.concurrent.thread
 
-class NoisePlayer(private val bufferProvider: (Int) -> ShortArray, private val volume: Float = 0.7f) {
+class NoisePlayer(private val bufferProvider: (Int) -> ShortArray) {
     private var audioTrack: AudioTrack? = null
     private var playThread: Thread? = null
     @Volatile private var isPlaying = false
@@ -32,9 +32,6 @@ class NoisePlayer(private val bufferProvider: (Int) -> ShortArray, private val v
             while (isPlaying) {
                 val noise = bufferProvider(bufferSize)
                 // Apply volume scaling
-                for (i in noise.indices) {
-                    noise[i] = (noise[i] * volume).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
-                }
                 audioTrack?.write(noise, 0, noise.size)
             }
         }
