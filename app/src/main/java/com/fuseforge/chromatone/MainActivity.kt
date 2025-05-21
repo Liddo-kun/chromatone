@@ -3,6 +3,7 @@ package com.fuseforge.chromatone
 import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -197,7 +198,7 @@ fun MainScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
         ) {
-            var sliderPosition by remember { mutableStateOf((timerMinutes ?: 0) / 15f) }
+            var sliderPosition by remember { mutableStateOf((timerMinutes?.toFloat() ?: 0f) / 60f) }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -208,16 +209,29 @@ fun MainScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                     value = sliderPosition,
                     onValueChange = {
                         sliderPosition = it
-                        viewModel.setTimer((it * 15).toInt().coerceAtMost(480))
+                        val minutes = if (it == 0f) null else (it * 60).toInt().coerceAtMost(480)
+                        viewModel.setTimer(minutes)
                     },
-                    valueRange = 0f..32f,
-                    steps = 31
+                    valueRange = 0f..8f,
+                    steps = 8 * 4 - 1 // 15-min increments
                 )
-                Text(
-                    text = if (sliderPosition == 0f) "∞" else "${(sliderPosition * 15).toInt()} min",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Black.copy(alpha = 0.6f)
-                )
+                if ((timerMinutes ?: 0) > 0) {
+                    val hours = (remainingSeconds ?: 0) / 3600
+                    val minutes = ((remainingSeconds ?: 0) % 3600) / 60
+                    val seconds = (remainingSeconds ?: 0) % 60
+                    val timeStr = String.format("%d:%02d:%02d", hours, minutes, seconds)
+                    Text(
+                        text = timeStr,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Black.copy(alpha = 0.6f)
+                    )
+                } else {
+                    Text(
+                        text = "∞",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Black.copy(alpha = 0.6f)
+                    )
+                }
             }
         }
     }
@@ -256,9 +270,32 @@ class MainViewModel : ViewModel() {
     val remainingSeconds: LiveData<Int?> = _remainingSeconds
     private var timerJob: Job? = null
     private var appContext: Context? = null
+    private var prefs: SharedPreferences? = null
 
     fun setAppContext(context: Context) {
         appContext = context.applicationContext
+        prefs = appContext?.getSharedPreferences("chromatone_prefs", Context.MODE_PRIVATE)
+        restoreTimerState()
+    }
+
+    private fun saveTimerState() {
+        prefs?.edit()?.apply {
+            putInt("timer_minutes", _timerMinutes.value ?: 0)
+            putInt("remaining_seconds", _remainingSeconds.value ?: 0)
+            putBoolean("is_playing", _isPlaying.value ?: false)
+            apply()
+        }
+    }
+
+    private fun restoreTimerState() {
+        val minutes = prefs?.getInt("timer_minutes", 0) ?: 0
+        val seconds = prefs?.getInt("remaining_seconds", 0) ?: 0
+        val playing = prefs?.getBoolean("is_playing", false) ?: false
+        if (minutes > 0) _timerMinutes.value = minutes else _timerMinutes.value = null
+        if (seconds > 0) _remainingSeconds.value = seconds else _remainingSeconds.value = null
+        _isPlaying.value = playing
+        // Optionally, auto-resume timer if was playing
+        if (playing && minutes != null) startTimer()
     }
 
     fun selectNoise(type: NoiseType) {
@@ -271,6 +308,7 @@ class MainViewModel : ViewModel() {
     fun setTimer(minutes: Int?) {
         _timerMinutes.value = minutes
         _remainingSeconds.value = if (minutes != null) minutes * 60 else null
+        saveTimerState()
         if (minutes == null) {
             timerJob?.cancel()
             timerJob = null
@@ -287,6 +325,7 @@ class MainViewModel : ViewModel() {
                 delay(1000)
                 seconds--
                 _remainingSeconds.value = seconds
+                saveTimerState()
             }
             if (seconds == 0) {
                 stopNoise()
@@ -326,5 +365,6 @@ class MainViewModel : ViewModel() {
         super.onCleared()
         stopNoise()
         timerJob?.cancel()
+        saveTimerState()
     }
 }

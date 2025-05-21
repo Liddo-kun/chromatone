@@ -22,8 +22,8 @@ com.fuseforge.chromatone/
 ### 3. Code Quality Standards
 - Kotlin coding conventions
 - Clear documentation for complex logic
-- Unit tests for business logic
-- UI tests for critical paths
+- No unit tests (project intentionally avoids test complexity)
+- No UI tests (manual device checks only for critical flows)
 - No warnings policy
 - Clear naming conventions
 
@@ -35,15 +35,16 @@ com.fuseforge.chromatone/
 - Small APK size target (<5MB)
 
 ### 5. Testing Strategy
-- Unit tests for:
+- No automated unit or UI tests
+- Manual device checks for:
   - Audio generation
   - Timer logic
   - State management
-- UI tests for:
   - Noise selection
   - Play/pause functionality
   - Timer functionality
-- Battery consumption tests
+- Battery consumption and APK size checked via profiling tools as needed
+- Always run a full Gradle build (`./gradlew clean build`) after making changes to ensure the project builds successfully before testing on a device.
 
 ### 6. Git Workflow
 - Feature branches from main
@@ -74,7 +75,7 @@ com.fuseforge.chromatone/
 
 ## Definition of Done
 1. Code compiles without warnings
-2. All tests pass
+2. Manual device checks pass for all flows
 3. No memory leaks
 4. Meets performance targets
 5. Follows design principles
