@@ -3,7 +3,6 @@ package com.fuseforge.chromatone
 import android.Manifest
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -174,20 +173,41 @@ fun MainScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                 onSelect = { viewModel.selectNoise(it) },
                 modifier = Modifier.weight(1f)
             )
-            
-            // Play/Pause button
-            IconButton(
-                onClick = { viewModel.toggleNoise() },
-                modifier = Modifier
-                    .size(64.dp)
-                    .padding(8.dp)
+            // Play/Pause button with countdown next to it
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.padding(8.dp)
             ) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (isPlaying) "Pause" else "Play",
-                    tint = Color.Black,
-                    modifier = Modifier.fillMaxSize()
-                )
+                IconButton(
+                    onClick = { viewModel.toggleNoise() },
+                    modifier = Modifier.size(64.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        tint = Color.Black,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                if (isPlaying) {
+                    val timerLabel = when {
+                        timerMinutes == null || timerMinutes == 0 -> "∞"
+                        remainingSeconds != null -> {
+                            val hrs = remainingSeconds!! / 3600
+                            val mins = (remainingSeconds!! % 3600) / 60
+                            val secs = remainingSeconds!! % 60
+                            String.format("%02d:%02d:%02d", hrs, mins, secs)
+                        }
+                        else -> "∞"
+                    }
+                    Text(
+                        text = timerLabel,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.Black.copy(alpha = 0.8f),
+                        modifier = Modifier.padding(start = 16.dp)
+                    )
+                }
             }
         }
 
@@ -198,40 +218,24 @@ fun MainScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
         ) {
-            var sliderPosition by remember { mutableStateOf((timerMinutes?.toFloat() ?: 0f) / 60f) }
-            Column(
+            var sliderPosition by remember { mutableStateOf((timerMinutes ?: 0) / 15f) }
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 32.dp, vertical = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                contentAlignment = Alignment.Center
             ) {
                 Slider(
                     value = sliderPosition,
                     onValueChange = {
                         sliderPosition = it
-                        val minutes = if (it == 0f) null else (it * 60).toInt().coerceAtMost(480)
-                        viewModel.setTimer(minutes)
+                        val minutes = (it * 15).toInt().coerceAtMost(480)
+                        viewModel.setTimer(if (minutes == 0) null else minutes)
                     },
-                    valueRange = 0f..8f,
-                    steps = 8 * 4 - 1 // 15-min increments
+                    valueRange = 0f..32f,
+                    steps = 31,
+                    modifier = Modifier.fillMaxWidth()
                 )
-                if ((timerMinutes ?: 0) > 0) {
-                    val hours = (remainingSeconds ?: 0) / 3600
-                    val minutes = ((remainingSeconds ?: 0) % 3600) / 60
-                    val seconds = (remainingSeconds ?: 0) % 60
-                    val timeStr = String.format("%d:%02d:%02d", hours, minutes, seconds)
-                    Text(
-                        text = timeStr,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Black.copy(alpha = 0.6f)
-                    )
-                } else {
-                    Text(
-                        text = "∞",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Black.copy(alpha = 0.6f)
-                    )
-                }
             }
         }
     }
@@ -270,32 +274,9 @@ class MainViewModel : ViewModel() {
     val remainingSeconds: LiveData<Int?> = _remainingSeconds
     private var timerJob: Job? = null
     private var appContext: Context? = null
-    private var prefs: SharedPreferences? = null
 
     fun setAppContext(context: Context) {
         appContext = context.applicationContext
-        prefs = appContext?.getSharedPreferences("chromatone_prefs", Context.MODE_PRIVATE)
-        restoreTimerState()
-    }
-
-    private fun saveTimerState() {
-        prefs?.edit()?.apply {
-            putInt("timer_minutes", _timerMinutes.value ?: 0)
-            putInt("remaining_seconds", _remainingSeconds.value ?: 0)
-            putBoolean("is_playing", _isPlaying.value ?: false)
-            apply()
-        }
-    }
-
-    private fun restoreTimerState() {
-        val minutes = prefs?.getInt("timer_minutes", 0) ?: 0
-        val seconds = prefs?.getInt("remaining_seconds", 0) ?: 0
-        val playing = prefs?.getBoolean("is_playing", false) ?: false
-        if (minutes > 0) _timerMinutes.value = minutes else _timerMinutes.value = null
-        if (seconds > 0) _remainingSeconds.value = seconds else _remainingSeconds.value = null
-        _isPlaying.value = playing
-        // Optionally, auto-resume timer if was playing
-        if (playing && minutes != null) startTimer()
     }
 
     fun selectNoise(type: NoiseType) {
@@ -307,16 +288,23 @@ class MainViewModel : ViewModel() {
 
     fun setTimer(minutes: Int?) {
         _timerMinutes.value = minutes
-        _remainingSeconds.value = if (minutes != null) minutes * 60 else null
-        saveTimerState()
-        if (minutes == null) {
+        if (minutes == null || minutes == 0) {
+            // Timer off (∞)
             timerJob?.cancel()
             timerJob = null
+            _remainingSeconds.value = null
+        } else {
+            _remainingSeconds.value = minutes * 60
+            if (_isPlaying.value == true) {
+                // If playing, restart countdown immediately
+                startTimer(fromSeconds = minutes * 60)
+            }
         }
     }
 
-    fun startTimer() {
-        val totalSeconds = _timerMinutes.value?.times(60) ?: return
+    // Overload startTimer to allow starting from a specific value
+    fun startTimer(fromSeconds: Int? = null) {
+        val totalSeconds = fromSeconds ?: _timerMinutes.value?.times(60) ?: return
         timerJob?.cancel()
         timerJob = CoroutineScope(Dispatchers.Main).launch {
             var seconds = totalSeconds
@@ -325,7 +313,6 @@ class MainViewModel : ViewModel() {
                 delay(1000)
                 seconds--
                 _remainingSeconds.value = seconds
-                saveTimerState()
             }
             if (seconds == 0) {
                 stopNoise()
@@ -365,6 +352,5 @@ class MainViewModel : ViewModel() {
         super.onCleared()
         stopNoise()
         timerJob?.cancel()
-        saveTimerState()
     }
 }
