@@ -11,11 +11,6 @@
                 <DeviceId pluginId="PhysicalDevice" identifier="serial=R8YW70P747P" />
               </handle>
             </Target>
-            <Target type="DEFAULT_BOOT">
-              <handle>
-                <DeviceId pluginId="LocalEmulator" identifier="path=/Users/surendran/.android/avd/Medium_Phone.avd" />
-              </handle>
-            </Target>
           </targets>
         </DialogSelection>
       </SelectionState>
