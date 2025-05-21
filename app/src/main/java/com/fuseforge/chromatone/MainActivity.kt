@@ -10,23 +10,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -59,6 +55,147 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
+fun MainScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
+    val selectedNoise by viewModel.selectedNoise.observeAsState(NoiseType.White)
+    val isPlaying by viewModel.isPlaying.observeAsState(false)
+    val timerMinutes by viewModel.timerMinutes.observeAsState(null)
+    val remainingSeconds by viewModel.remainingSeconds.observeAsState(null)
+    val context = LocalContext.current
+    var showInfoDialog by remember { mutableStateOf(false) }
+    var sliderPosition by remember { mutableStateOf((timerMinutes ?: 0) / 15f) }
+
+    LaunchedEffect(Unit) {
+        viewModel.setAppContext(context)
+    }
+
+    Box(
+        modifier = modifier
+            .background(Color.White)
+            .fillMaxSize()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Top
+        ) {
+            // Top bar with app title and info button
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp, start = 16.dp, end = 16.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "ChromaTone",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.Black,
+                    modifier = Modifier.weight(1f)
+                )
+                // Countdown timer (if active) on the top right, before the info button
+                if (isPlaying && remainingSeconds != null) {
+                    val hrs = (remainingSeconds ?: 0) / 3600
+                    val mins = ((remainingSeconds ?: 0) % 3600) / 60
+                    val secs = (remainingSeconds ?: 0) % 60
+                    Text(
+                        text = String.format("%02d:%02d:%02d", hrs, mins, secs),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.Black,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
+                IconButton(
+                    onClick = { showInfoDialog = true },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Info",
+                        tint = Color.Black
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            // Grid of noise types (with black outline)
+            NoiseGrid(
+                selected = selectedNoise,
+                isPlaying = isPlaying,
+                onSelect = { viewModel.selectNoise(it) },
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            // Play/Pause button (centered, above seek bar)
+            IconButton(
+                onClick = { viewModel.toggleNoise() },
+                modifier = Modifier
+                    .size(56.dp)
+                    .padding(4.dp)
+            ) {
+                Icon(
+                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = if (isPlaying) "Pause" else "Play",
+                    tint = Color.Black,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            // Timer slider (seek bar) always visible, below play/pause
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Slider(
+                    value = (remainingSeconds?.div(60f)?.div(15f)) ?: sliderPosition,
+                    onValueChange = {
+                        sliderPosition = it
+                        val minutes = (it * 15).toInt().coerceAtMost(480)
+                        viewModel.setTimer(minutes)
+                        if (minutes > 0 && isPlaying) {
+                            viewModel.startTimer()
+                        }
+                    },
+                    valueRange = 0f..32f,
+                    steps = 31
+                )
+                // Show countdown in HH:MM:SS if timer is set, else show "∞"
+                val seconds = remainingSeconds ?: ((sliderPosition * 15).toInt() * 60).takeIf { it > 0 }
+                if (seconds != null && seconds > 0) {
+                    val hrs = seconds / 3600
+                    val mins = (seconds % 3600) / 60
+                    val secs = seconds % 60
+                    Text(
+                        text = String.format("%02d:%02d:%02d", hrs, mins, secs),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Black.copy(alpha = 0.6f)
+                    )
+                } else {
+                    Text(
+                        text = "∞",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Black.copy(alpha = 0.6f)
+                    )
+                }
+            }
+        }
+        // Minimal info dialog
+        if (showInfoDialog) {
+            AlertDialog(
+                onDismissRequest = { showInfoDialog = false },
+                title = { Text("About ChromaTone") },
+                text = { Text("ChromaTone is a minimal noise app. No data is collected. For privacy info, see the app listing.") },
+                confirmButton = {
+                    TextButton(onClick = { showInfoDialog = false }) {
+                        Text("OK")
+                    }
+                }
+            )
+        }
+    }
+}
+
+// Minimal NoiseGrid (with black outline for color grid, no shadow or decorative elements)
+@Composable
 fun NoiseGrid(
     selected: NoiseType,
     isPlaying: Boolean,
@@ -69,11 +206,10 @@ fun NoiseGrid(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .padding(16.dp)
+            .padding(horizontal = 8.dp, vertical = 0.dp)
     ) {
         val isLandscape = maxWidth > maxHeight
-        val spacing = 12.dp
-        
+        val spacing = 8.dp
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(spacing)
@@ -88,191 +224,37 @@ fun NoiseGrid(
                         if (index < noiseTypes.size) {
                             val noise = noiseTypes[index]
                             val isSelected = noise == selected
-                            Surface(
+                            Box(
                                 modifier = Modifier
                                     .weight(1f)
                                     .aspectRatio(if (isLandscape) 2f else 1.5f)
-                                    .shadow(
-                                        elevation = if (isSelected) 4.dp else 1.dp,
-                                        shape = MaterialTheme.shapes.medium
-                                    )
-                                    .border(
-                                        width = if (isSelected) 2.dp else 0.dp,
-                                        color = if (isSelected) Color.Black else Color.Transparent,
-                                        shape = MaterialTheme.shapes.medium
-                                    )
                                     .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                                    .clip(MaterialTheme.shapes.medium)
+                                    .background(noise.color)
+                                    .border(
+                                        width = 2.dp,
+                                        color = if (isSelected) Color.Black else Color.Black.copy(alpha = 0.3f)
+                                    )
                                     .clickable { onSelect(noise) },
-                                color = noise.color,
-                                shape = MaterialTheme.shapes.medium
                             ) {
-                                Box(Modifier.fillMaxSize()) {
-                                    Column(
-                                        modifier = Modifier
-                                            .padding(8.dp)
-                                            .fillMaxSize(),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
-                                        Text(
-                                            text = noise.purpose,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            color = Color.Black.copy(alpha = 0.87f),
-                                            textAlign = TextAlign.Center
-                                        )
-                                    }
-                                    if (isSelected && isPlaying) {
-                                        Icon(
-                                            imageVector = Icons.Filled.PlayArrow,
-                                            contentDescription = "Playing",
-                                            tint = Color.Black,
-                                            modifier = Modifier
-                                                .align(Alignment.TopEnd)
-                                                .padding(6.dp)
-                                                .size(20.dp)
-                                        )
-                                    }
+                                Column(
+                                    modifier = Modifier
+                                        .padding(4.dp)
+                                        .fillMaxSize(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Text(
+                                        text = noise.purpose,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color.Black,
+                                        textAlign = TextAlign.Center
+                                    )
                                 }
                             }
                         }
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun MainScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
-    val selectedNoise by viewModel.selectedNoise.observeAsState(NoiseType.White)
-    val isPlaying by viewModel.isPlaying.observeAsState(false)
-    val timerMinutes by viewModel.timerMinutes.observeAsState(null)
-    val remainingSeconds by viewModel.remainingSeconds.observeAsState(null)
-    val context = LocalContext.current
-
-    var showInfoDialog by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        viewModel.setAppContext(context)
-    }
-
-    Box(
-        modifier = modifier
-            .background(Color.White)
-            .fillMaxSize()
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = if (isPlaying) 96.dp else 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            // Grid of noise types
-            NoiseGrid(
-                selected = selectedNoise,
-                isPlaying = isPlaying,
-                onSelect = { viewModel.selectNoise(it) },
-                modifier = Modifier.weight(1f)
-            )
-            // Play/Pause button with countdown next to it
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.padding(8.dp)
-            ) {
-                IconButton(
-                    onClick = { viewModel.toggleNoise() },
-                    modifier = Modifier.size(64.dp)
-                ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Play",
-                        tint = Color.Black,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                if (isPlaying) {
-                    val timerLabel = when {
-                        timerMinutes == null || timerMinutes == 0 -> "∞"
-                        remainingSeconds != null -> {
-                            val hrs = remainingSeconds!! / 3600
-                            val mins = (remainingSeconds!! % 3600) / 60
-                            val secs = remainingSeconds!! % 60
-                            String.format("%02d:%02d:%02d", hrs, mins, secs)
-                        }
-                        else -> "∞"
-                    }
-                    Text(
-                        text = timerLabel,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.Black.copy(alpha = 0.8f),
-                        modifier = Modifier.padding(start = 16.dp)
-                    )
-                }
-            }
-        }
-
-        // Timer slider (if playing)
-        AnimatedVisibility(
-            visible = isPlaying,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-        ) {
-            var sliderPosition by remember { mutableStateOf((timerMinutes ?: 0) / 15f) }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp, vertical = 16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Slider(
-                    value = sliderPosition,
-                    onValueChange = {
-                        sliderPosition = it
-                        val minutes = (it * 15).toInt().coerceAtMost(480)
-                        viewModel.setTimer(if (minutes == 0) null else minutes)
-                    },
-                    valueRange = 0f..32f,
-                    steps = 31,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-
-        // Info button (top right)
-        IconButton(
-            onClick = { showInfoDialog = true },
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(24.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Info,
-                contentDescription = "Info",
-                tint = Color.Black.copy(alpha = 0.7f)
-            )
-        }
-
-        // Info dialog
-        if (showInfoDialog) {
-            AlertDialog(
-                onDismissRequest = { showInfoDialog = false },
-                title = { Text("About ChromaTone") },
-                text = {
-                    Text(
-                        "ChromaTone\n\nA privacy-first, minimal noise utility. No data collection. No tracking. No network calls.\n\nVersion 1.0.0",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                },
-                confirmButton = {
-                    TextButton(onClick = { showInfoDialog = false }) {
-                        Text("OK")
-                    }
-                }
-            )
         }
     }
 }
@@ -324,23 +306,15 @@ class MainViewModel : ViewModel() {
 
     fun setTimer(minutes: Int?) {
         _timerMinutes.value = minutes
-        if (minutes == null || minutes == 0) {
-            // Timer off (∞)
+        _remainingSeconds.value = if (minutes != null) minutes * 60 else null
+        if (minutes == null) {
             timerJob?.cancel()
             timerJob = null
-            _remainingSeconds.value = null
-        } else {
-            _remainingSeconds.value = minutes * 60
-            if (_isPlaying.value == true) {
-                // If playing, restart countdown immediately
-                startTimer(fromSeconds = minutes * 60)
-            }
         }
     }
 
-    // Overload startTimer to allow starting from a specific value
-    fun startTimer(fromSeconds: Int? = null) {
-        val totalSeconds = fromSeconds ?: _timerMinutes.value?.times(60) ?: return
+    fun startTimer() {
+        val totalSeconds = _timerMinutes.value?.times(60) ?: return
         timerJob?.cancel()
         timerJob = CoroutineScope(Dispatchers.Main).launch {
             var seconds = totalSeconds
