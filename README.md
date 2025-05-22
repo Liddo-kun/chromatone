@@ -1,11 +1,25 @@
-# ChromaTone
+<p align="center">
+  <img src="docs/logos.png" alt="ChromaTone Logo" width="220"/>
+</p>
 
-[![GitHub release](https://img.shields.io/github/v/release/surendranb/chromatone?label=Latest%20Release)](https://github.com/surendranb/chromatone/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Platform: Android](https://img.shields.io/badge/platform-Android-blue.svg)](https://developer.android.com/)
-[![APK Size < 5MB](https://img.shields.io/badge/APK%20Size-<5MB-success)](https://github.com/surendranb/chromatone/releases)
+<h1 align="center">ChromaTone</h1>
 
-Minimal, battery-optimized ambient noise app for focus, sleep, and relaxation. Open source, privacy-first, and works fully offline. Generate 6 different types of noise on your Android device—no ads, no tracking, no login, no network required.
+<p align="center">
+  <a href="https://github.com/surendranb/chromatone/releases"><img src="https://img.shields.io/github/v/release/surendranb/chromatone?label=Latest%20Release" alt="GitHub release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT"></a>
+  <a href="https://developer.android.com/"><img src="https://img.shields.io/badge/platform-Android-blue.svg" alt="Platform: Android"></a>
+  <a href="https://github.com/surendranb/chromatone/releases"><img src="https://img.shields.io/badge/APK%20Size-<5MB-success" alt="APK Size < 5MB"></a>
+  <a href="https://github.com/surendranb/chromatone/stargazers"><img src="https://img.shields.io/github/stars/surendranb/chromatone?style=social" alt="GitHub stars"></a>
+  <a href="https://github.com/surendranb/chromatone/network/members"><img src="https://img.shields.io/github/forks/surendranb/chromatone?style=social" alt="GitHub forks"></a>
+  <a href="https://github.com/surendranb/chromatone/issues"><img src="https://img.shields.io/github/issues/surendranb/chromatone" alt="GitHub issues"></a>
+  <a href="https://github.com/surendranb/chromatone/pulls"><img src="https://img.shields.io/github/issues-pr/surendranb/chromatone" alt="GitHub pull requests"></a>
+</p>
+
+<p align="center">
+  Minimal, battery-optimized ambient noise app for focus, sleep, and relaxation.<br>
+  <b>Open source, privacy-first, and works fully offline.</b><br>
+  Generate 6 different types of noise on your Android device—no ads, no tracking, no login, no network required.
+</p>
 
 ---
 
