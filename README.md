@@ -73,11 +73,7 @@ All noise is generated on-device for maximum privacy, battery efficiency, and pe
 
 ---
 ## 🖼️ Screenshot
-<img src = "docs/latest.png" height="300">
-
-
-![ChromaTone Minimal UI](docs/latest.png)
-
+<img src = "docs/latest.png" height="600">
 ---
 
 ## 🛠️ Contributing
