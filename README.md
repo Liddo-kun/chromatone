@@ -11,8 +11,8 @@
   <a href="https://github.com/surendranb/chromatone/releases"><img src="https://img.shields.io/badge/APK%20Size-<5MB-success" alt="APK Size < 5MB"></a>
   <a href="https://github.com/surendranb/chromatone/stargazers"><img src="https://img.shields.io/github/stars/surendranb/chromatone?style=social" alt="GitHub stars"></a>
   <a href="https://github.com/surendranb/chromatone/network/members"><img src="https://img.shields.io/github/forks/surendranb/chromatone?style=social" alt="GitHub forks"></a>
-  <a href="https://github.com/surendranb/chromatone/issues"><img src="https://img.shields.io/github/issues/surendranb/chromatone" alt="GitHub issues"></a>
-  <a href="https://github.com/surendranb/chromatone/pulls"><img src="https://img.shields.io/github/issues-pr/surendranb/chromatone" alt="GitHub pull requests"></a>
+  <!-- <a href="https://github.com/surendranb/chromatone/issues"><img src="https://img.shields.io/github/issues/surendranb/chromatone" alt="GitHub issues"></a>
+  <a href="https://github.com/surendranb/chromatone/pulls"><img src="https://img.shields.io/github/issues-pr/surendranb/chromatone" alt="GitHub pull requests"></a> -->
 </p>
 
 <p align="center">
