@@ -9,17 +9,6 @@ Minimal, battery-optimized ambient noise app for focus, sleep, and relaxation. O
 
 ---
 
-## 🚧 Planned Features
-- Additional ambient sounds: rain, ocean, wind, forest, and more
-- Customizable sound mixes (combine multiple noise types or ambient sounds)
-- Dark mode and more color themes
-- Widget for quick access from home screen
-- Scheduling (auto start/stop at set times)
-- Android Auto and Wear OS support
-- User feedback-driven improvements
-
----
-
 ## 🎧 What is ChromaTone?
 ChromaTone generates six scientifically recognized types of noise for different needs:
 - **White Noise** (FOCUS): Balanced across all frequencies, ideal for masking distractions and boosting focus.
@@ -73,7 +62,19 @@ All noise is generated on-device for maximum privacy, battery efficiency, and pe
 
 ---
 
-## 🖼️ Screenshots
+## 🚧 Planned Features
+- Additional ambient sounds: rain, ocean, wind, forest, and more
+- Customizable sound mixes (combine multiple noise types or ambient sounds)
+- Dark mode and more color themes
+- Widget for quick access from home screen
+- Scheduling (auto start/stop at set times)
+- Android Auto and Wear OS support
+- User feedback-driven improvements
+
+---
+## 🖼️ Screenshot
+<img src = "docs/latest.png" height="300">
+
 
 ![ChromaTone Minimal UI](docs/latest.png)
 
