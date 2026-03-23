@@ -8,11 +8,14 @@ import kotlin.concurrent.thread
 class NoisePlayer(private val bufferProvider: (Int) -> ShortArray) {
     private var audioTrack: AudioTrack? = null
     private var playThread: Thread? = null
-    @Volatile private var isPlaying = false
+    @Volatile private var shouldPlay = false
+
+    val isPlaying: Boolean
+        get() = audioTrack?.playState == AudioTrack.PLAYSTATE_PLAYING
 
     fun start() {
         if (isPlaying) return
-        isPlaying = true
+        shouldPlay = true
         val sampleRate = 44100
         val bufferSize = AudioTrack.getMinBufferSize(
             sampleRate,
@@ -29,20 +32,19 @@ class NoisePlayer(private val bufferProvider: (Int) -> ShortArray) {
         )
         audioTrack?.play()
         playThread = thread(start = true) {
-            while (isPlaying) {
+            while (shouldPlay) {
                 val noise = bufferProvider(bufferSize)
-                // Apply volume scaling
                 audioTrack?.write(noise, 0, noise.size)
             }
         }
     }
 
     fun stop() {
-        isPlaying = false
+        shouldPlay = false
         playThread?.join(200)
         audioTrack?.stop()
         audioTrack?.release()
         audioTrack = null
         playThread = null
     }
-} 
+}

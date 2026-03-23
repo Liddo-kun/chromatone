@@ -1,8 +1,6 @@
 package com.fuseforge.chromatone
 
 import android.Manifest
-import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -10,10 +8,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Pause
@@ -27,17 +29,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.ViewModel
 import com.fuseforge.chromatone.ui.theme.ChromaToneTheme
-import kotlinx.coroutines.*
 
 class MainActivity : ComponentActivity() {
     private val mainViewModel: MainViewModel by viewModels()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Request notification permission for Android 13+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1001)
@@ -54,9 +51,17 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private fun formatTime(totalSeconds: Int): String {
+    val hrs = totalSeconds / 3600
+    val mins = (totalSeconds % 3600) / 60
+    val secs = totalSeconds % 60
+    return String.format("%02d:%02d:%02d", hrs, mins, secs)
+}
+
 @Composable
 fun MainScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
-    val selectedNoise by viewModel.selectedNoise.observeAsState(NoiseType.White)
+    val volumes by viewModel.soundVolumes.observeAsState(emptyMap())
+    val sources by viewModel.sourceOrder.observeAsState(ALL_SOUND_SOURCES)
     val isPlaying by viewModel.isPlaying.observeAsState(false)
     val timerMinutes by viewModel.timerMinutes.observeAsState(null)
     val remainingSeconds by viewModel.remainingSeconds.observeAsState(null)
@@ -74,12 +79,10 @@ fun MainScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
             .fillMaxSize()
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize(),
+            modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top
         ) {
-            // Top bar with app title and info button
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -92,13 +95,9 @@ fun MainScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                     color = Color.Black,
                     modifier = Modifier.weight(1f)
                 )
-                // Countdown timer (if active) on the top right, before the info button
                 if (isPlaying && remainingSeconds != null) {
-                    val hrs = (remainingSeconds ?: 0) / 3600
-                    val mins = ((remainingSeconds ?: 0) % 3600) / 60
-                    val secs = (remainingSeconds ?: 0) % 60
                     Text(
-                        text = String.format("%02d:%02d:%02d", hrs, mins, secs),
+                        text = formatTime(remainingSeconds ?: 0),
                         style = MaterialTheme.typography.titleMedium,
                         color = Color.Black,
                         modifier = Modifier.padding(end = 8.dp)
@@ -116,17 +115,17 @@ fun MainScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
-            // Grid of noise types (with black outline)
-            NoiseGrid(
-                selected = selectedNoise,
-                isPlaying = isPlaying,
-                onSelect = { viewModel.selectNoise(it) },
+            SoundGrid(
+                sources = sources,
+                volumes = volumes,
+                onToggle = { viewModel.toggleSound(it) },
+                onVolumeChange = { source, volume -> viewModel.setVolume(source, volume) },
+                onMoveToTop = { viewModel.moveToTop(it) },
                 modifier = Modifier.weight(1f)
             )
             Spacer(modifier = Modifier.height(16.dp))
-            // Play/Pause button (centered, above seek bar)
             IconButton(
-                onClick = { viewModel.toggleNoise() },
+                onClick = { viewModel.togglePlayback() },
                 modifier = Modifier
                     .size(56.dp)
                     .padding(4.dp)
@@ -138,7 +137,6 @@ fun MainScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                     modifier = Modifier.fillMaxSize()
                 )
             }
-            // Timer slider (seek bar) always visible, below play/pause
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -158,27 +156,22 @@ fun MainScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                     valueRange = 0f..32f,
                     steps = 31
                 )
-                // Show countdown in HH:MM:SS if timer is set, else show "∞"
                 val seconds = remainingSeconds ?: ((sliderPosition * 15).toInt() * 60).takeIf { it > 0 }
                 if (seconds != null && seconds > 0) {
-                    val hrs = seconds / 3600
-                    val mins = (seconds % 3600) / 60
-                    val secs = seconds % 60
                     Text(
-                        text = String.format("%02d:%02d:%02d", hrs, mins, secs),
+                        text = formatTime(seconds),
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.Black.copy(alpha = 0.6f)
                     )
                 } else {
                     Text(
-                        text = "∞",
+                        text = "\u221E",
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.Black.copy(alpha = 0.6f)
                     )
                 }
             }
         }
-        // Minimal info dialog
         if (showInfoDialog) {
             AlertDialog(
                 onDismissRequest = { showInfoDialog = false },
@@ -194,173 +187,67 @@ fun MainScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     }
 }
 
-// Minimal NoiseGrid (with black outline for color grid, no shadow or decorative elements)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun NoiseGrid(
-    selected: NoiseType,
-    isPlaying: Boolean,
-    onSelect: (NoiseType) -> Unit,
+fun SoundGrid(
+    sources: List<SoundSource>,
+    volumes: Map<SoundSource, Float>,
+    onToggle: (SoundSource) -> Unit,
+    onVolumeChange: (SoundSource, Float) -> Unit,
+    onMoveToTop: (SoundSource) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val noiseTypes = NoiseType.values()
-    BoxWithConstraints(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 0.dp)
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        contentPadding = PaddingValues(horizontal = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier.fillMaxWidth()
     ) {
-        val isLandscape = maxWidth > maxHeight
-        val spacing = 8.dp
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(spacing)
-        ) {
-            for (row in 0..1) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(spacing)
+        items(sources, key = { it.key }) { source ->
+            val volume = volumes[source] ?: 0f
+            val isActive = volume > 0f
+            Box(
+                modifier = Modifier
+                    .aspectRatio(1f)
+                    .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                    .background(source.color)
+                    .border(
+                        width = if (isActive) 3.dp else 1.dp,
+                        color = if (isActive) Color.Black else Color.Black.copy(alpha = 0.3f)
+                    )
+                    .combinedClickable(
+                        onClick = { onToggle(source) },
+                        onLongClick = { onMoveToTop(source) }
+                    )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    for (col in 0..2) {
-                        val index = row * 3 + col
-                        if (index < noiseTypes.size) {
-                            val noise = noiseTypes[index]
-                            val isSelected = noise == selected
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .aspectRatio(if (isLandscape) 2f else 1.5f)
-                                    .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                                    .background(noise.color)
-                                    .border(
-                                        width = 2.dp,
-                                        color = if (isSelected) Color.Black else Color.Black.copy(alpha = 0.3f)
-                                    )
-                                    .clickable { onSelect(noise) },
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .padding(4.dp)
-                                        .fillMaxSize(),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    Text(
-                                        text = noise.purpose,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = Color.Black,
-                                        textAlign = TextAlign.Center
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    Text(
+                        text = source.displayName.uppercase(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (isActive) Color.Black else Color.Black.copy(alpha = 0.5f),
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Slider(
+                        value = volume,
+                        onValueChange = { onVolumeChange(source, it) },
+                        valueRange = 0f..1f,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.Black,
+                            activeTrackColor = Color.Black,
+                            inactiveTrackColor = Color.Black.copy(alpha = 0.2f)
+                        )
+                    )
                 }
             }
         }
-    }
-}
-
-// Assign a distinct color to each noise type
-val NoiseType.color: Color
-    get() = when (this) {
-        NoiseType.White -> Color(0xFFF5F5F5)
-        NoiseType.Pink -> Color(0xFFFFC1E3)
-        NoiseType.Brown -> Color(0xFFD7CCC8)
-        NoiseType.Green -> Color(0xFFC8E6C9)
-        NoiseType.Blue -> Color(0xFFBBDEFB)
-        NoiseType.Violet -> Color(0xFFE1BEE7)
-    }
-
-// Data model for noise types
-enum class NoiseType(val displayName: String, val purpose: String) {
-    White("White Noise", "FOCUS"),
-    Pink("Pink Noise", "RELAX"),
-    Brown("Brown Noise", "SLEEP"),
-    Blue("Blue Noise", "REST"),
-    Green("Green Noise", "CREATE"),
-    Violet("Violet Noise", "STUDY")
-}
-
-// ViewModel for main screen
-class MainViewModel : ViewModel() {
-    private val _selectedNoise = MutableLiveData(NoiseType.White)
-    val selectedNoise: LiveData<NoiseType> = _selectedNoise
-    private val _isPlaying = MutableLiveData(false)
-    val isPlaying: LiveData<Boolean> = _isPlaying
-    private val _timerMinutes = MutableLiveData<Int?>(null)
-    val timerMinutes: LiveData<Int?> = _timerMinutes
-    private val _remainingSeconds = MutableLiveData<Int?>(null)
-    val remainingSeconds: LiveData<Int?> = _remainingSeconds
-    private var timerJob: Job? = null
-    private var appContext: Context? = null
-
-    fun setAppContext(context: Context) {
-        appContext = context.applicationContext
-    }
-
-    fun selectNoise(type: NoiseType) {
-        _selectedNoise.value = type
-        if (_isPlaying.value == true) {
-            playNoise()
-        }
-    }
-
-    fun setTimer(minutes: Int?) {
-        _timerMinutes.value = minutes
-        _remainingSeconds.value = if (minutes != null) minutes * 60 else null
-        if (minutes == null) {
-            timerJob?.cancel()
-            timerJob = null
-        }
-    }
-
-    fun startTimer() {
-        val totalSeconds = _timerMinutes.value?.times(60) ?: return
-        timerJob?.cancel()
-        timerJob = CoroutineScope(Dispatchers.Main).launch {
-            var seconds = totalSeconds
-            _remainingSeconds.value = seconds
-            while (seconds > 0 && _isPlaying.value == true) {
-                delay(1000)
-                seconds--
-                _remainingSeconds.value = seconds
-            }
-            if (seconds == 0) {
-                stopNoise()
-                setTimer(null)
-            }
-        }
-    }
-
-    fun playNoise() {
-        val context = appContext ?: return
-        val type = _selectedNoise.value ?: NoiseType.White
-        val intent = Intent(context, NoiseForegroundService::class.java).apply {
-            putExtra(NoiseForegroundService.EXTRA_NOISE_TYPE, type.name)
-            action = NoiseForegroundService.ACTION_PLAY
-        }
-        context.startService(intent)
-        _isPlaying.value = true
-        if (_timerMinutes.value != null) {
-            startTimer()
-        }
-    }
-
-    fun stopNoise() {
-        val context = appContext ?: return
-        val intent = Intent(context, NoiseForegroundService::class.java).apply {
-            action = NoiseForegroundService.ACTION_STOP
-        }
-        context.startService(intent)
-        _isPlaying.value = false
-    }
-    
-    fun toggleNoise() {
-        if (_isPlaying.value == true) stopNoise() else playNoise()
-    }
-    
-    override fun onCleared() {
-        super.onCleared()
-        stopNoise()
-        timerJob?.cancel()
     }
 }

@@ -3,14 +3,37 @@ package com.fuseforge.chromatone.audio
 import com.fuseforge.chromatone.NoiseType
 import kotlin.math.PI
 import kotlin.math.sin
+import kotlin.math.tanh
 import kotlin.random.Random
 
 object NoiseGenerator {
-    /**
-     * Generate a buffer of white noise samples (PCM 16-bit, mono)
-     * @param numSamples Number of samples to generate
-     * @return ShortArray of PCM samples
-     */
+    // Pink noise state
+    private var pinkRows = DoubleArray(16)
+    private var pinkRunningSum = 0.0
+
+    // Brown noise state
+    private var brownLast = 0.0
+
+    // Green noise state
+    private var greenPhase = 0.0
+
+    // Blue noise state
+    private var blueLast = 0.0
+
+    // Violet noise state
+    private var violetLast = 0.0
+    private var violetLastBlue = 0.0
+
+    fun reset() {
+        pinkRows = DoubleArray(16)
+        pinkRunningSum = 0.0
+        brownLast = 0.0
+        greenPhase = 0.0
+        blueLast = 0.0
+        violetLast = 0.0
+        violetLastBlue = 0.0
+    }
+
     fun generateWhiteNoise(numSamples: Int): ShortArray {
         val buffer = ShortArray(numSamples)
         for (i in buffer.indices) {
@@ -19,90 +42,69 @@ object NoiseGenerator {
         return buffer
     }
 
-    /**
-     * Generate a buffer of pink noise samples (simple Voss-McCartney algorithm)
-     */
     fun generatePinkNoise(numSamples: Int): ShortArray {
         val buffer = ShortArray(numSamples)
-        val rows = 16
+        val rows = pinkRows.size
         val random = Random.Default
-        val white = DoubleArray(rows)
-        var sum = 0.0
         for (i in buffer.indices) {
             val k = random.nextInt(rows)
-            white[k] = random.nextDouble(-1.0, 1.0)
-            sum = white.sum()
-            buffer[i] = ((sum / rows) * Short.MAX_VALUE).toInt().toShort()
+            val newValue = random.nextDouble(-1.0, 1.0)
+            pinkRunningSum -= pinkRows[k]
+            pinkRunningSum += newValue
+            pinkRows[k] = newValue
+            buffer[i] = ((pinkRunningSum / rows) * Short.MAX_VALUE).toInt().toShort()
         }
         return buffer
     }
 
-    /**
-     * Generate a buffer of brown noise samples (integrated white noise)
-     */
     fun generateBrownNoise(numSamples: Int): ShortArray {
         val buffer = ShortArray(numSamples)
-        var last = 0.0
         for (i in buffer.indices) {
             val white = Random.nextDouble(-1.0, 1.0)
-            last = (last + (0.02 * white)).coerceIn(-1.0, 1.0)
-            buffer[i] = (last * Short.MAX_VALUE).toInt().toShort()
+            brownLast = brownLast * 0.996 + 0.004 * white
+            buffer[i] = (tanh(brownLast * 4.0) * Short.MAX_VALUE).toInt().toShort()
         }
         return buffer
     }
 
-    /**
-     * Generate a buffer of green noise samples (bandpass filtered white noise, rough approximation)
-     */
     fun generateGreenNoise(numSamples: Int, sampleRate: Int = 44100): ShortArray {
-        // Green noise is often defined as white noise filtered around 500 Hz
         val buffer = ShortArray(numSamples)
         val freq = 500.0
+        val phaseIncrement = 2 * PI * freq / sampleRate
         for (i in buffer.indices) {
-            val t = i / sampleRate.toDouble()
             val white = Random.nextDouble(-1.0, 1.0)
-            val mod = sin(2 * PI * freq * t)
+            val mod = sin(greenPhase)
+            greenPhase += phaseIncrement
+            if (greenPhase > 2 * PI) greenPhase -= 2 * PI
             buffer[i] = ((white * mod) * Short.MAX_VALUE).toInt().toShort()
         }
         return buffer
     }
 
-    /**
-     * Generate a buffer of blue noise samples (differentiated white noise)
-     */
     fun generateBlueNoise(numSamples: Int): ShortArray {
         val buffer = ShortArray(numSamples)
-        var last = 0.0
         for (i in buffer.indices) {
             val white = Random.nextDouble(-1.0, 1.0)
-            val blue = white - last
-            last = white
+            val blue = white - blueLast
+            blueLast = white
             buffer[i] = (blue * Short.MAX_VALUE).toInt().toShort()
         }
         return buffer
     }
 
-    /**
-     * Generate a buffer of violet noise samples (differentiated blue noise)
-     */
     fun generateVioletNoise(numSamples: Int): ShortArray {
         val buffer = ShortArray(numSamples)
-        var last = 0.0
-        var lastBlue = 0.0
         for (i in buffer.indices) {
             val white = Random.nextDouble(-1.0, 1.0)
-            val blue = white - last
-            val violet = blue - lastBlue
-            last = white
-            lastBlue = blue
+            val blue = white - violetLast
+            val violet = blue - violetLastBlue
+            violetLast = white
+            violetLastBlue = blue
             buffer[i] = (violet * Short.MAX_VALUE).toInt().toShort()
         }
         return buffer
     }
 
-    /**
-     * Get a buffer for the given noise type
-     */
     fun getNoiseBuffer(type: NoiseType, numSamples: Int): ShortArray = when (type) {
         NoiseType.White -> generateWhiteNoise(numSamples)
         NoiseType.Pink -> generatePinkNoise(numSamples)
@@ -111,4 +113,4 @@ object NoiseGenerator {
         NoiseType.Blue -> generateBlueNoise(numSamples)
         NoiseType.Violet -> generateVioletNoise(numSamples)
     }
-} 
+}

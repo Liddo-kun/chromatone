@@ -7,9 +7,9 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import com.fuseforge.chromatone.audio.GaplessLooper
 import com.fuseforge.chromatone.audio.NoiseGenerator
 import com.fuseforge.chromatone.audio.NoisePlayer
 
@@ -20,29 +20,32 @@ class NoiseForegroundService : Service() {
         const val ACTION_PLAY = "com.fuseforge.chromatone.PLAY"
         const val ACTION_PAUSE = "com.fuseforge.chromatone.PAUSE"
         const val ACTION_STOP = "com.fuseforge.chromatone.STOP"
-        const val EXTRA_NOISE_TYPE = "noise_type"
+        const val ACTION_SYNC = "com.fuseforge.chromatone.SYNC"
+
+        @Volatile
+        var activeNoises: Map<SoundSource, Float> = emptyMap()
     }
 
     private var noisePlayer: NoisePlayer? = null
-    private var isPlaying = false
-    private var currentNoiseType: NoiseType = NoiseType.White
+    private var mixBuffer: DoubleArray? = null
+    private var resultBuffer: ShortArray? = null
+    private val loopers = mutableMapOf<String, GaplessLooper>()
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Get extras for noise type if present
-        intent?.getStringExtra(EXTRA_NOISE_TYPE)?.let {
-            currentNoiseType = NoiseType.valueOf(it)
-        }
+    private val isPlaying: Boolean
+        get() = noisePlayer?.isPlaying ?: false
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_PLAY -> handlePlay()
             ACTION_PAUSE -> handlePause()
             ACTION_STOP -> handleStop()
-            else -> if (!isPlaying) handlePlay() // Default: start playback if not already
+            ACTION_SYNC -> syncMediaPlayers()
+            else -> if (!isPlaying) handlePlay()
         }
         startForeground(NOTIFICATION_ID, buildNotification(isPlaying))
         return START_STICKY
@@ -52,11 +55,12 @@ class NoiseForegroundService : Service() {
 
     private fun handlePlay() {
         noisePlayer?.stop()
-        noisePlayer = NoisePlayer(
-            bufferProvider = { bufferSize -> NoiseGenerator.getNoiseBuffer(currentNoiseType, bufferSize) }
-        )
+        NoiseGenerator.reset()
+        noisePlayer = NoisePlayer { bufferSize ->
+            mixNoiseBuffers(bufferSize)
+        }
         noisePlayer?.start()
-        isPlaying = true
+        syncMediaPlayers()
         updateNotification()
     }
 
@@ -64,16 +68,77 @@ class NoiseForegroundService : Service() {
         if (!isPlaying) return
         noisePlayer?.stop()
         noisePlayer = null
-        isPlaying = false
+        loopers.values.forEach { it.pause() }
         updateNotification()
     }
 
     private fun handleStop() {
         noisePlayer?.stop()
         noisePlayer = null
-        isPlaying = false
+        releaseAllLoopers()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    private fun syncMediaPlayers() {
+        val noises = activeNoises
+        val activeKeys = noises.keys.filterIsInstance<AmbientSound>().map { it.key }.toSet()
+
+        // Remove stale loopers
+        loopers.keys.minus(activeKeys).forEach { key ->
+            loopers.remove(key)?.release()
+        }
+
+        // Create/update loopers
+        for ((source, volume) in noises) {
+            if (source !is AmbientSound || volume <= 0f) continue
+            val v = volume * volume
+            val looper = loopers.getOrPut(source.key) {
+                GaplessLooper(this, source.rawResId)
+            }
+            looper.setVolume(v)
+            if (isPlaying && !looper.isPlaying) looper.start()
+        }
+    }
+
+    private fun releaseAllLoopers() {
+        loopers.values.forEach { it.release() }
+        loopers.clear()
+    }
+
+    private fun mixNoiseBuffers(bufferSize: Int): ShortArray {
+        val noises = activeNoises
+        if (noises.isEmpty()) return ShortArray(bufferSize)
+
+        var mixed = mixBuffer
+        if (mixed == null || mixed.size != bufferSize) {
+            mixed = DoubleArray(bufferSize)
+            mixBuffer = mixed
+        } else {
+            mixed.fill(0.0)
+        }
+
+        var hasActive = false
+        for ((source, volume) in noises) {
+            if (source !is GeneratedNoise || volume <= 0f) continue
+            hasActive = true
+            val scaledVolume = volume.toDouble() * volume.toDouble()
+            val buffer = NoiseGenerator.getNoiseBuffer(source.noiseType, bufferSize)
+            for (i in mixed.indices) {
+                mixed[i] += buffer[i].toDouble() * scaledVolume
+            }
+        }
+        if (!hasActive) return ShortArray(bufferSize)
+
+        var result = resultBuffer
+        if (result == null || result.size != bufferSize) {
+            result = ShortArray(bufferSize)
+            resultBuffer = result
+        }
+        for (i in result.indices) {
+            result[i] = mixed[i].coerceIn(Short.MIN_VALUE.toDouble(), Short.MAX_VALUE.toDouble()).toInt().toShort()
+        }
+        return result
     }
 
     private fun updateNotification() {
@@ -82,6 +147,15 @@ class NoiseForegroundService : Service() {
     }
 
     private fun buildNotification(isPlaying: Boolean): Notification {
+        val activeNames = activeNoises.filter { it.value > 0f }.keys
+            .joinToString(", ") { it.displayName }
+        val contentText = if (isPlaying && activeNames.isNotEmpty())
+            "Playing $activeNames"
+        else if (isPlaying)
+            "Playing"
+        else
+            "Paused"
+
         val playPauseAction = if (isPlaying) {
             NotificationCompat.Action(
                 android.R.drawable.ic_media_pause,
@@ -102,7 +176,7 @@ class NoiseForegroundService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("ChromaTone")
-            .setContentText("Playing ${currentNoiseType.displayName}")
+            .setContentText(contentText)
             .setSmallIcon(android.R.drawable.ic_lock_silent_mode)
             .addAction(playPauseAction)
             .addAction(stopAction)
@@ -113,24 +187,23 @@ class NoiseForegroundService : Service() {
 
     private fun getPendingIntent(action: String): PendingIntent {
         val intent = Intent(this, NoiseForegroundService::class.java).apply { this.action = action }
-        return PendingIntent.getService(this, action.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0))
+        return PendingIntent.getService(this, action.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Playback",
-                NotificationManager.IMPORTANCE_LOW
-            )
-            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            manager.createNotificationChannel(channel)
-        }
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            "Playback",
+            NotificationManager.IMPORTANCE_LOW
+        )
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.createNotificationChannel(channel)
     }
 
     override fun onDestroy() {
         noisePlayer?.stop()
         noisePlayer = null
+        releaseAllLoopers()
         super.onDestroy()
     }
 }
