@@ -156,6 +156,15 @@ class MainViewModel : ViewModel() {
         }
     }
 
+    fun pauseNoise() {
+        val context = appContext ?: return
+        val intent = Intent(context, NoiseForegroundService::class.java).apply {
+            action = NoiseForegroundService.ACTION_PAUSE
+        }
+        context.startService(intent)
+        _isPlaying.value = false
+    }
+
     fun stopNoise() {
         val context = appContext ?: return
         val intent = Intent(context, NoiseForegroundService::class.java).apply {
@@ -166,7 +175,7 @@ class MainViewModel : ViewModel() {
     }
 
     fun togglePlayback() {
-        if (_isPlaying.value == true) stopNoise() else playNoise()
+        if (_isPlaying.value == true) pauseNoise() else playNoise()
     }
 
     override fun onCleared() {

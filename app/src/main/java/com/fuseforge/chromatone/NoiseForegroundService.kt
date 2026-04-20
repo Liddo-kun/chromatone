@@ -9,9 +9,10 @@ import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import com.fuseforge.chromatone.audio.GaplessLooper
 import com.fuseforge.chromatone.audio.NoiseGenerator
 import com.fuseforge.chromatone.audio.NoisePlayer
+import com.fuseforge.chromatone.audio.PcmDecoder
+import kotlinx.coroutines.*
 
 class NoiseForegroundService : Service() {
     companion object {
@@ -29,7 +30,12 @@ class NoiseForegroundService : Service() {
     private var noisePlayer: NoisePlayer? = null
     private var mixBuffer: DoubleArray? = null
     private var resultBuffer: ShortArray? = null
-    private val loopers = mutableMapOf<String, GaplessLooper>()
+    private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    @Volatile
+    private var pcmBuffers: Map<String, ShortArray> = emptyMap()
+    private val pcmPositions = mutableMapOf<String, Int>()
+    private val decoding = mutableSetOf<String>()
 
     override fun onCreate() {
         super.onCreate()
@@ -44,7 +50,7 @@ class NoiseForegroundService : Service() {
             ACTION_PLAY -> handlePlay()
             ACTION_PAUSE -> handlePause()
             ACTION_STOP -> handleStop()
-            ACTION_SYNC -> syncMediaPlayers()
+            ACTION_SYNC -> syncAmbientBuffers()
             else -> if (!isPlaying) handlePlay()
         }
         startForeground(NOTIFICATION_ID, buildNotification(isPlaying))
@@ -60,7 +66,7 @@ class NoiseForegroundService : Service() {
             mixNoiseBuffers(bufferSize)
         }
         noisePlayer?.start()
-        syncMediaPlayers()
+        syncAmbientBuffers()
         updateNotification()
     }
 
@@ -68,42 +74,36 @@ class NoiseForegroundService : Service() {
         if (!isPlaying) return
         noisePlayer?.stop()
         noisePlayer = null
-        loopers.values.forEach { it.pause() }
         updateNotification()
     }
 
     private fun handleStop() {
         noisePlayer?.stop()
         noisePlayer = null
-        releaseAllLoopers()
+        pcmBuffers = emptyMap()
+        pcmPositions.clear()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
-    private fun syncMediaPlayers() {
+    private fun syncAmbientBuffers() {
         val noises = activeNoises
         val activeKeys = noises.keys.filterIsInstance<AmbientSound>().map { it.key }.toSet()
 
-        // Remove stale loopers
-        loopers.keys.minus(activeKeys).forEach { key ->
-            loopers.remove(key)?.release()
-        }
+        pcmPositions.keys.removeAll { it !in activeKeys }
 
-        // Create/update loopers
         for ((source, volume) in noises) {
             if (source !is AmbientSound || volume <= 0f) continue
-            val v = volume * volume
-            val looper = loopers.getOrPut(source.key) {
-                GaplessLooper(this, source.rawResId)
+            val key = source.key
+            if (key in pcmBuffers || key in decoding) continue
+            decoding.add(key)
+            val resId = source.rawResId
+            serviceScope.launch {
+                val decoded = PcmDecoder.decode(this@NoiseForegroundService, key, resId)
+                pcmBuffers = pcmBuffers + (key to decoded)
+                decoding.remove(key)
             }
-            looper.setVolume(v)
-            if (isPlaying && !looper.isPlaying) looper.start()
         }
-    }
-
-    private fun releaseAllLoopers() {
-        loopers.values.forEach { it.release() }
-        loopers.clear()
     }
 
     private fun mixNoiseBuffers(bufferSize: Int): ShortArray {
@@ -119,6 +119,8 @@ class NoiseForegroundService : Service() {
         }
 
         var hasActive = false
+
+        // Mix generated noise
         for ((source, volume) in noises) {
             if (source !is GeneratedNoise || volume <= 0f) continue
             hasActive = true
@@ -128,6 +130,24 @@ class NoiseForegroundService : Service() {
                 mixed[i] += buffer[i].toDouble() * scaledVolume
             }
         }
+
+        // Mix ambient PCM loops
+        val buffers = pcmBuffers
+        for ((source, volume) in noises) {
+            if (source !is AmbientSound || volume <= 0f) continue
+            val pcm = buffers[source.key] ?: continue
+            if (pcm.isEmpty()) continue
+            hasActive = true
+            val scaledVolume = volume.toDouble() * volume.toDouble()
+            var pos = pcmPositions.getOrPut(source.key) { 0 }
+            for (i in mixed.indices) {
+                mixed[i] += pcm[pos].toDouble() * scaledVolume
+                pos++
+                if (pos >= pcm.size) pos = 0
+            }
+            pcmPositions[source.key] = pos
+        }
+
         if (!hasActive) return ShortArray(bufferSize)
 
         var result = resultBuffer
@@ -201,9 +221,11 @@ class NoiseForegroundService : Service() {
     }
 
     override fun onDestroy() {
+        serviceScope.cancel()
         noisePlayer?.stop()
         noisePlayer = null
-        releaseAllLoopers()
+        pcmBuffers = emptyMap()
+        pcmPositions.clear()
         super.onDestroy()
     }
 }

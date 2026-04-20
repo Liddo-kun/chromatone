@@ -247,7 +247,7 @@ fun SoundGrid(
 
             Box(
                 modifier = Modifier
-                    .aspectRatio(3f)
+                    .aspectRatio(2.5f)
                     .clip(tileShape)
                     .background(tileBg)
                     .border(
@@ -277,7 +277,7 @@ fun SoundGrid(
                         .background(SurfaceCard.copy(alpha = 0.45f))
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                    verticalArrangement = Arrangement.Bottom
                 ) {
                     Text(
                         text = source.displayName.uppercase(),
@@ -285,12 +285,12 @@ fun SoundGrid(
                         color = if (isActive) source.color else TextSecondary,
                         textAlign = TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.weight(1f))
                     Slider(
                         value = volume,
                         onValueChange = { onVolumeChange(source, it) },
                         valueRange = 0f..1f,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().height(24.dp),
                         colors = SliderDefaults.colors(
                             thumbColor = if (isActive) source.color else TextMuted,
                             activeTrackColor = if (isActive) source.color else TextMuted,
