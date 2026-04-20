@@ -28,6 +28,8 @@ class MainViewModel : ViewModel() {
 
     private var timerJob: Job? = null
     private var appContext: Context? = null
+    private val _savedVolumes = MutableLiveData<Map<String, Float>>(emptyMap())
+    val savedVolumesLive: LiveData<Map<String, Float>> = _savedVolumes
     private val savedVolumes = mutableMapOf<String, Float>()
 
     fun setAppContext(context: Context) {
@@ -61,11 +63,13 @@ class MainViewModel : ViewModel() {
                 savedVolumes[parts[0]] = parts[1].toFloatOrNull() ?: 1f
             }
         }
+        _savedVolumes.value = savedVolumes.toMap()
     }
 
     private fun saveSavedVolumes() {
         val data = savedVolumes.entries.joinToString(",") { "${it.key}=${it.value}" }
         prefs()?.edit()?.putString(KEY_SAVED_VOLUMES, data)?.apply()
+        _savedVolumes.value = savedVolumes.toMap()
     }
 
     // --- Sound control ---
@@ -75,7 +79,7 @@ class MainViewModel : ViewModel() {
         if (current.containsKey(source)) {
             updateVolumes(source, 0f)
         } else {
-            updateVolumes(source, savedVolumes[source.key] ?: 1f)
+            updateVolumes(source, savedVolumes[source.key] ?: 0.25f)
         }
     }
 

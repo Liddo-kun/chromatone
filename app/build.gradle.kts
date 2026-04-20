@@ -18,10 +18,19 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("../chromatone-release.jks")
+            storePassword = "chromatone123"
+            keyAlias = "chromatone"
+            keyPassword = "chromatone123"
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -37,6 +46,21 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+
+    applicationVariants.all {
+        if (buildType.name == "release") {
+            outputs.all {
+                val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+                output.outputFileName = "chromatone-release.apk"
+            }
+            val variant = this
+            assembleProvider.get().doLast {
+                val src = variant.outputs.first { it.outputFile.name.endsWith(".apk") }.outputFile
+                val dest = rootProject.file("chromatone-release.apk")
+                src.copyTo(dest, overwrite = true)
+            }
+        }
     }
 }
 

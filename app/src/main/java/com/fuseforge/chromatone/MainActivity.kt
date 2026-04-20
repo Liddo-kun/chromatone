@@ -16,20 +16,25 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.fuseforge.chromatone.ui.theme.ChromaToneTheme
+import com.fuseforge.chromatone.ui.theme.*
 
 class MainActivity : ComponentActivity() {
     private val mainViewModel: MainViewModel by viewModels()
@@ -43,7 +48,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             ChromaToneTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    containerColor = Surface
+                ) { innerPadding ->
                     MainScreen(mainViewModel, Modifier.padding(innerPadding))
                 }
             }
@@ -75,7 +83,7 @@ fun MainScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
 
     Box(
         modifier = modifier
-            .background(Color.White)
+            .background(Surface)
             .fillMaxSize()
     ) {
         Column(
@@ -83,23 +91,24 @@ fun MainScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top
         ) {
+            // Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp, start = 16.dp, end = 16.dp, bottom = 8.dp),
+                    .padding(top = 16.dp, start = 20.dp, end = 12.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "ChromaTone",
+                    text = "CHROMATONE",
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color.Black,
+                    color = TextPrimary,
                     modifier = Modifier.weight(1f)
                 )
                 if (isPlaying && remainingSeconds != null) {
                     Text(
                         text = formatTime(remainingSeconds ?: 0),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.Black,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary,
                         modifier = Modifier.padding(end = 8.dp)
                     )
                 }
@@ -110,37 +119,49 @@ fun MainScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                     Icon(
                         imageVector = Icons.Default.Info,
                         contentDescription = "Info",
-                        tint = Color.Black
+                        tint = TextMuted
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+
+            // Sound grid
+            val saved by viewModel.savedVolumesLive.observeAsState(emptyMap())
             SoundGrid(
                 sources = sources,
                 volumes = volumes,
+                savedVolumes = saved,
                 onToggle = { viewModel.toggleSound(it) },
                 onVolumeChange = { source, volume -> viewModel.setVolume(source, volume) },
                 onMoveToTop = { viewModel.moveToTop(it) },
                 modifier = Modifier.weight(1f)
             )
+
             Spacer(modifier = Modifier.height(16.dp))
+
+            // Play/Pause button
             IconButton(
                 onClick = { viewModel.togglePlayback() },
                 modifier = Modifier
-                    .size(56.dp)
-                    .padding(4.dp)
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (isPlaying) Accent.copy(alpha = 0.15f)
+                        else SurfaceCard
+                    )
             ) {
                 Icon(
                     imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     contentDescription = if (isPlaying) "Pause" else "Play",
-                    tint = Color.Black,
-                    modifier = Modifier.fillMaxSize()
+                    tint = if (isPlaying) Accent else TextPrimary,
+                    modifier = Modifier.size(32.dp)
                 )
             }
+
+            // Timer
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Slider(
@@ -154,32 +175,35 @@ fun MainScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                         }
                     },
                     valueRange = 0f..32f,
-                    steps = 31
+                    steps = 31,
+                    colors = SliderDefaults.colors(
+                        thumbColor = Accent,
+                        activeTrackColor = Accent,
+                        inactiveTrackColor = TextMuted.copy(alpha = 0.3f),
+                        activeTickColor = Color.Transparent,
+                        inactiveTickColor = Color.Transparent
+                    )
                 )
                 val seconds = remainingSeconds ?: ((sliderPosition * 15).toInt() * 60).takeIf { it > 0 }
-                if (seconds != null && seconds > 0) {
-                    Text(
-                        text = formatTime(seconds),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Black.copy(alpha = 0.6f)
-                    )
-                } else {
-                    Text(
-                        text = "\u221E",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Black.copy(alpha = 0.6f)
-                    )
-                }
+                Text(
+                    text = if (seconds != null && seconds > 0) formatTime(seconds) else "\u221E",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
             }
+            Spacer(modifier = Modifier.height(8.dp))
         }
         if (showInfoDialog) {
             AlertDialog(
                 onDismissRequest = { showInfoDialog = false },
+                containerColor = SurfaceElevated,
+                titleContentColor = TextPrimary,
+                textContentColor = TextSecondary,
                 title = { Text("About ChromaTone") },
                 text = { Text("ChromaTone is a minimal noise app. No data is collected. For privacy info, see the app listing.") },
                 confirmButton = {
                     TextButton(onClick = { showInfoDialog = false }) {
-                        Text("OK")
+                        Text("OK", color = Accent)
                     }
                 }
             )
@@ -192,46 +216,73 @@ fun MainScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
 fun SoundGrid(
     sources: List<SoundSource>,
     volumes: Map<SoundSource, Float>,
+    savedVolumes: Map<String, Float>,
     onToggle: (SoundSource) -> Unit,
     onVolumeChange: (SoundSource, Float) -> Unit,
     onMoveToTop: (SoundSource) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
-        contentPadding = PaddingValues(horizontal = 8.dp),
+        columns = GridCells.Fixed(2),
+        contentPadding = PaddingValues(horizontal = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier.fillMaxWidth()
     ) {
         items(sources, key = { it.key }) { source ->
-            val volume = volumes[source] ?: 0f
-            val isActive = volume > 0f
+            val isActive = volumes.containsKey(source)
+            val volume = if (isActive) volumes[source]!! else (savedVolumes[source.key] ?: 0f)
+            val tileShape = RoundedCornerShape(12.dp)
+
+            // Active: source color at 20% over card surface; inactive: plain card surface
+            val tileBg = if (isActive)
+                source.color.copy(alpha = 0.20f).compositeOver(SurfaceCard)
+            else
+                SurfaceCard
+
+            val borderColor = if (isActive)
+                source.color.copy(alpha = 0.5f)
+            else
+                Color.Transparent
+
             Box(
                 modifier = Modifier
-                    .aspectRatio(1f)
-                    .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                    .background(source.color)
+                    .aspectRatio(3f)
+                    .clip(tileShape)
+                    .background(tileBg)
                     .border(
-                        width = if (isActive) 3.dp else 1.dp,
-                        color = if (isActive) Color.Black else Color.Black.copy(alpha = 0.3f)
+                        width = 1.dp,
+                        color = borderColor,
+                        shape = tileShape
                     )
                     .combinedClickable(
                         onClick = { onToggle(source) },
                         onLongClick = { onMoveToTop(source) }
                     )
             ) {
+                // Background icon filling the tile
+                Icon(
+                    imageVector = source.icon,
+                    contentDescription = null,
+                    tint = source.color.copy(alpha = if (isActive) 0.6f else 0.25f),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { scaleX = 1.4f; scaleY = 1.4f }
+                        .padding(4.dp)
+                )
+                // Translucent overlay with controls
                 Column(
                     modifier = Modifier
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                        .fillMaxSize(),
+                        .fillMaxSize()
+                        .background(SurfaceCard.copy(alpha = 0.45f))
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
                     Text(
                         text = source.displayName.uppercase(),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (isActive) Color.Black else Color.Black.copy(alpha = 0.5f),
+                        color = if (isActive) source.color else TextSecondary,
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(4.dp))
@@ -241,9 +292,9 @@ fun SoundGrid(
                         valueRange = 0f..1f,
                         modifier = Modifier.fillMaxWidth(),
                         colors = SliderDefaults.colors(
-                            thumbColor = Color.Black,
-                            activeTrackColor = Color.Black,
-                            inactiveTrackColor = Color.Black.copy(alpha = 0.2f)
+                            thumbColor = if (isActive) source.color else TextMuted,
+                            activeTrackColor = if (isActive) source.color else TextMuted,
+                            inactiveTrackColor = TextMuted.copy(alpha = 0.2f)
                         )
                     )
                 }

@@ -61,8 +61,8 @@ object NoiseGenerator {
         val buffer = ShortArray(numSamples)
         for (i in buffer.indices) {
             val white = Random.nextDouble(-1.0, 1.0)
-            brownLast = brownLast * 0.996 + 0.004 * white
-            buffer[i] = (tanh(brownLast * 4.0) * Short.MAX_VALUE).toInt().toShort()
+            brownLast = brownLast * 0.991 + 0.009 * white
+            buffer[i] = (tanh(brownLast * 10.0) * Short.MAX_VALUE).toInt().toShort()
         }
         return buffer
     }
