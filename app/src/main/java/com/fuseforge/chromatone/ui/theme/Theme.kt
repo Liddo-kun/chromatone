@@ -18,7 +18,7 @@ private val ColorScheme = darkColorScheme(
 )
 
 @Composable
-fun ChromaToneTheme(
+fun SleepyToneTheme(
     content: @Composable () -> Unit
 ) {
     MaterialTheme(

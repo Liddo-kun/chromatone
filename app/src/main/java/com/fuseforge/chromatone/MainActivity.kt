@@ -47,7 +47,7 @@ class MainActivity : ComponentActivity() {
         }
         enableEdgeToEdge()
         setContent {
-            ChromaToneTheme {
+            SleepyToneTheme {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     containerColor = Surface
@@ -99,7 +99,7 @@ fun MainScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "CHROMATONE",
+                    text = "SLEEPYTONE",
                     style = MaterialTheme.typography.titleMedium,
                     color = TextPrimary,
                     modifier = Modifier.weight(1f)
@@ -199,8 +199,8 @@ fun MainScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                 containerColor = SurfaceElevated,
                 titleContentColor = TextPrimary,
                 textContentColor = TextSecondary,
-                title = { Text("About ChromaTone") },
-                text = { Text("ChromaTone is a minimal noise app. No data is collected. For privacy info, see the app listing.") },
+                title = { Text("About SleepyTone") },
+                text = { Text("SleepyTone is a minimal ambient noise app. No data is collected. For privacy info, see the app listing.") },
                 confirmButton = {
                     TextButton(onClick = { showInfoDialog = false }) {
                         Text("OK", color = Accent)

@@ -195,7 +195,7 @@ class NoiseForegroundService : Service() {
             getPendingIntent(ACTION_STOP)
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("ChromaTone")
+            .setContentTitle("SleepyTone")
             .setContentText(contentText)
             .setSmallIcon(android.R.drawable.ic_lock_silent_mode)
             .addAction(playPauseAction)

@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ChromaTone"
+rootProject.name = "SleepyTone"
 include(":app")
