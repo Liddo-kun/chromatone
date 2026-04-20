@@ -1,107 +1,78 @@
-<p align="center">
-  <img src="docs/logos.png" alt="ChromaTone Logo" width="220"/>
-</p>
-
-<h1 align="center">ChromaTone</h1>
+<h1 align="center">SleepyTone</h1>
 
 <p align="center">
-  <a href="https://github.com/surendranb/chromatone/releases"><img src="https://img.shields.io/github/v/release/surendranb/chromatone?label=Latest%20Release" alt="GitHub release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT"></a>
   <a href="https://developer.android.com/"><img src="https://img.shields.io/badge/platform-Android-blue.svg" alt="Platform: Android"></a>
-  <a href="https://github.com/surendranb/chromatone/releases"><img src="https://img.shields.io/badge/APK%20Size-<5MB-success" alt="APK Size < 5MB"></a>
-  <a href="https://github.com/surendranb/chromatone/stargazers"><img src="https://img.shields.io/github/stars/surendranb/chromatone?style=social" alt="GitHub stars"></a>
-  <a href="https://github.com/surendranb/chromatone/network/members"><img src="https://img.shields.io/github/forks/surendranb/chromatone?style=social" alt="GitHub forks"></a>
-  <!-- <a href="https://github.com/surendranb/chromatone/issues"><img src="https://img.shields.io/github/issues/surendranb/chromatone" alt="GitHub issues"></a>
-  <a href="https://github.com/surendranb/chromatone/pulls"><img src="https://img.shields.io/github/issues-pr/surendranb/chromatone" alt="GitHub pull requests"></a> -->
+  <a href="https://github.com/Liddo-kun/chromatone/releases"><img src="https://img.shields.io/github/v/release/Liddo-kun/chromatone?label=release" alt="GitHub release"></a>
 </p>
 
-<p align="justify">
-  Minimal, battery-optimized ambient noise app for focus, sleep, and relaxation.<br>
-  <b>Open source, privacy-first, and works fully offline.</b><br>
-  Generate 6 different types of noise on your Android device—no ads, no tracking, no login, no network required.
+<p align="center">
+  Ambient noise and sound mixer for sleep, focus, and relaxation.<br>
+  <b>No ads. No tracking. No internet required.</b>
+</p>
+
+<p align="center">
+  <img src="docs/screenshot.png" width="300"/>
 </p>
 
 ---
 
-## 🎧 What is ChromaTone?
-ChromaTone generates six scientifically recognized types of noise for different needs:
-- **White Noise** (FOCUS): Balanced across all frequencies, ideal for masking distractions and boosting focus.
-- **Pink Noise** (RELAX): More energy in lower frequencies, great for relaxation and gentle focus.
-- **Brown Noise** (SLEEP): Deep, low-frequency sound, perfect for sleep and deep relaxation.
-- **Blue Noise** (REST): Higher energy in upper frequencies, for alertness and clarity.
-- **Green Noise** (CREATE): Mid-frequency emphasis, for creative work and calm.
-- **Violet Noise** (STUDY): High-frequency, subtle sound, for study and concentration.
+## What is SleepyTone?
 
-All noise is generated on-device for maximum privacy, battery efficiency, and performance. ChromaTone is designed for Android, works fully offline, and never collects or shares your data.
+SleepyTone mixes procedural noise generators with ambient sound loops through a single audio pipeline, giving you glitch-free layering with per-source volume control.
 
----
+**25 sounds to mix:**
 
-## 🚀 Quick Start
+| Noise Generators | Ambient Loops |
+|---|---|
+| White, Pink, Brown | Rain, Window Rain, Thunder |
+| Green, Blue, Violet | Ocean, Creek, Fire |
+| | Crickets, Toads, Whale (x2) |
+| | Fan, AC, Airplane |
+| | Cat Purring, Purring 2 |
+| | 5 Hz Brainwave, LF Hum (x2) |
+| | Melody |
 
-### 1. Download the Latest APK
-- Go to [Releases](https://github.com/surendranb/chromatone/releases) and download the latest `app-release.apk`.
-- Transfer to your Android device and install. (You may need to allow installs from unknown sources.)
-
-### 2. Build from Source
-1. **Clone the repository:**
-   ```sh
-   git clone https://github.com/surendranb/chromatone.git
-   cd chromatone
-   ```
-2. **Open in Android Studio** (Giraffe or newer recommended).
-3. **Build & Run:**
-   - Connect your Android device (minSdk 26, Android 8.0+)
-   - Click 'Run' ▶️ in Android Studio, or use the emulator.
+All noise is generated on-device. Ambient loops are decoded once and cached for instant playback on subsequent launches.
 
 ---
 
-## 📱 App Features
-- **Minimal UI:** No clutter, just the essentials for quick access to ambient, focus, sleep, and relaxation sounds.
-- **Timer:** Set a sleep or focus timer with a single slider. Countdown is always visible.
-- **Background Playback:** Audio continues even when the app is in the background.
-- **Battery Optimized:** Uses Android's foreground service for efficient playback and minimal battery drain.
-- **No Ads, No Tracking:** No analytics, no network calls, no data collection—ever.
-- **Tiny APK:** Under 5MB, fast to install and update.
-- **Works Offline:** All noise is generated locally, no internet required.
-- **No Account Needed:** No logins, no personal data.
-- **Device Optimized:** Runs smoothly on all modern Android devices, including low-end phones.
+## Features
+
+- **Sound mixing** -- combine any number of sources with individual volume sliders
+- **Sleep timer** -- set up to 8 hours, countdown visible in the header
+- **Background playback** -- runs as a foreground service, keeps playing when you leave the app
+- **Dark UI** -- designed for bedtime use
+- **Offline** -- everything runs locally, no network calls
+- **Tiny footprint** -- under 10 MB APK, minimal battery drain
 
 ---
 
-## 🔒 Privacy & Security
-- **No permissions except audio, notifications, and backup.**
-- **No analytics, tracking, or network code.**
-- **No data leaves your device.**
-- **Open source:** Review the code any time.
+## Install
+
+Download the latest APK from [Releases](https://github.com/Liddo-kun/chromatone/releases) and sideload it. Android 8.0+ (API 26) required.
+
+## Build from source
+
+```sh
+git clone https://github.com/Liddo-kun/chromatone.git
+cd chromatone
+./gradlew assembleRelease
+```
+
+The signed APK is output to the project root as `chromatone-release.apk`.
 
 ---
 
-## 🚧 Planned Features
-- Additional ambient sounds: rain, ocean, wind, forest, and more
-- Customizable sound mixes (combine multiple noise types or ambient sounds)
-- Dark mode and more color themes
-- Widget for quick access from home screen
-- Scheduling (auto start/stop at set times)
-- Android Auto and Wear OS support
-- User feedback-driven improvements
+## Privacy
 
----
-## 🖼️ Screenshot
-<img src = "docs/latest.png" height="600">
----
-
-## 🛠️ Contributing
-Contributions are welcome! Please open an issue or pull request for bug fixes, features, or suggestions.
+- No analytics, no tracking, no network code
+- No data leaves your device
+- Only requires audio, notification, and backup permissions
+- Open source -- review the code anytime
 
 ---
 
-## 📄 License
+## License
+
 MIT License. See [LICENSE](LICENSE) for details.
-
----
-
-## 💡 Troubleshooting
-- If you can't install the APK, check your device's security settings for 'Install unknown apps.'
-- For build issues, ensure you have the latest Android Studio and SDK tools.
-
----
