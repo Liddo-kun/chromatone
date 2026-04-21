@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import com.fuseforge.chromatone.audio.Biquad
 import com.fuseforge.chromatone.audio.NoiseGenerator
 import com.fuseforge.chromatone.audio.NoisePlayer
 import com.fuseforge.chromatone.audio.PcmDecoder
@@ -22,6 +23,7 @@ class NoiseForegroundService : Service() {
         const val ACTION_PAUSE = "com.fuseforge.chromatone.PAUSE"
         const val ACTION_STOP = "com.fuseforge.chromatone.STOP"
         const val ACTION_SYNC = "com.fuseforge.chromatone.SYNC"
+        const val MASTER_GAIN = 0.8
 
         @Volatile
         var activeNoises: Map<SoundSource, Float> = emptyMap()
@@ -30,6 +32,7 @@ class NoiseForegroundService : Service() {
     private var noisePlayer: NoisePlayer? = null
     private var mixBuffer: DoubleArray? = null
     private var resultBuffer: ShortArray? = null
+    private val highPass = Biquad.highPass(40.0, 44100.0)
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     @Volatile
@@ -62,6 +65,7 @@ class NoiseForegroundService : Service() {
     private fun handlePlay() {
         noisePlayer?.stop()
         NoiseGenerator.reset()
+        highPass.reset()
         noisePlayer = NoisePlayer { bufferSize ->
             mixNoiseBuffers(bufferSize)
         }
@@ -106,13 +110,14 @@ class NoiseForegroundService : Service() {
         }
     }
 
-    private fun mixNoiseBuffers(bufferSize: Int): ShortArray {
+    private fun mixNoiseBuffers(frameCount: Int): ShortArray {
+        val stereoSize = frameCount * 2
         val noises = activeNoises
-        if (noises.isEmpty()) return ShortArray(bufferSize)
+        if (noises.isEmpty()) return ShortArray(stereoSize)
 
         var mixed = mixBuffer
-        if (mixed == null || mixed.size != bufferSize) {
-            mixed = DoubleArray(bufferSize)
+        if (mixed == null || mixed.size != frameCount) {
+            mixed = DoubleArray(frameCount)
             mixBuffer = mixed
         } else {
             mixed.fill(0.0)
@@ -125,7 +130,7 @@ class NoiseForegroundService : Service() {
             if (source !is GeneratedNoise || volume <= 0f) continue
             hasActive = true
             val scaledVolume = volume.toDouble() * volume.toDouble()
-            val buffer = NoiseGenerator.getNoiseBuffer(source.noiseType, bufferSize)
+            val buffer = NoiseGenerator.getNoiseBuffer(source.noiseType, frameCount)
             for (i in mixed.indices) {
                 mixed[i] += buffer[i].toDouble() * scaledVolume
             }
@@ -148,15 +153,19 @@ class NoiseForegroundService : Service() {
             pcmPositions[source.key] = pos
         }
 
-        if (!hasActive) return ShortArray(bufferSize)
+        if (!hasActive) return ShortArray(stereoSize)
+
+        highPass.processInPlace(mixed)
 
         var result = resultBuffer
-        if (result == null || result.size != bufferSize) {
-            result = ShortArray(bufferSize)
+        if (result == null || result.size != stereoSize) {
+            result = ShortArray(stereoSize)
             resultBuffer = result
         }
-        for (i in result.indices) {
-            result[i] = mixed[i].coerceIn(Short.MIN_VALUE.toDouble(), Short.MAX_VALUE.toDouble()).toInt().toShort()
+        for (i in 0 until frameCount) {
+            val s = (mixed[i] * MASTER_GAIN).coerceIn(Short.MIN_VALUE.toDouble(), Short.MAX_VALUE.toDouble()).toInt().toShort()
+            result[i * 2] = s
+            result[i * 2 + 1] = s
         }
         return result
     }

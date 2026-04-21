@@ -37,7 +37,7 @@ object NoiseGenerator {
     fun generateWhiteNoise(numSamples: Int): ShortArray {
         val buffer = ShortArray(numSamples)
         for (i in buffer.indices) {
-            buffer[i] = (Random.nextDouble(-1.0, 1.0) * Short.MAX_VALUE).toInt().toShort()
+            buffer[i] = (Random.nextDouble(-1.0, 1.0) * Short.MAX_VALUE * 0.5).toInt().toShort()
         }
         return buffer
     }

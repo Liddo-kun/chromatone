@@ -1,11 +1,12 @@
 package com.fuseforge.chromatone.audio
 
+import android.media.AudioAttributes
 import android.media.AudioFormat
-import android.media.AudioManager
 import android.media.AudioTrack
+import android.os.Build
 import kotlin.concurrent.thread
 
-class NoisePlayer(private val bufferProvider: (Int) -> ShortArray) {
+class NoisePlayer(private val bufferProvider: (frameCount: Int) -> ShortArray) {
     private var audioTrack: AudioTrack? = null
     private var playThread: Thread? = null
     @Volatile private var shouldPlay = false
@@ -17,24 +18,40 @@ class NoisePlayer(private val bufferProvider: (Int) -> ShortArray) {
         if (isPlaying) return
         shouldPlay = true
         val sampleRate = 44100
-        val bufferSize = AudioTrack.getMinBufferSize(
+        val minStereoBytes = AudioTrack.getMinBufferSize(
             sampleRate,
-            AudioFormat.CHANNEL_OUT_MONO,
+            AudioFormat.CHANNEL_OUT_STEREO,
             AudioFormat.ENCODING_PCM_16BIT
         )
-        audioTrack = AudioTrack(
-            AudioManager.STREAM_MUSIC,
-            sampleRate,
-            AudioFormat.CHANNEL_OUT_MONO,
-            AudioFormat.ENCODING_PCM_16BIT,
-            bufferSize,
-            AudioTrack.MODE_STREAM
-        )
+        val framesPerWrite = minStereoBytes / 2
+
+        val attributesBuilder = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ALARM)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+        if (Build.VERSION.SDK_INT >= 32) {
+            attributesBuilder.setSpatializationBehavior(
+                AudioAttributes.SPATIALIZATION_BEHAVIOR_NEVER
+            )
+        }
+
+        val format = AudioFormat.Builder()
+            .setSampleRate(sampleRate)
+            .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
+            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+            .build()
+
+        audioTrack = AudioTrack.Builder()
+            .setAudioAttributes(attributesBuilder.build())
+            .setAudioFormat(format)
+            .setBufferSizeInBytes(minStereoBytes)
+            .setTransferMode(AudioTrack.MODE_STREAM)
+            .build()
+
         audioTrack?.play()
-        playThread = thread(start = true) {
+        playThread = thread(start = true, name = "NoisePlayer") {
             while (shouldPlay) {
-                val noise = bufferProvider(bufferSize)
-                audioTrack?.write(noise, 0, noise.size)
+                val stereo = bufferProvider(framesPerWrite)
+                audioTrack?.write(stereo, 0, stereo.size)
             }
         }
     }
