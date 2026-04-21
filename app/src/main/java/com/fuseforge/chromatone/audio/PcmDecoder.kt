@@ -9,7 +9,8 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 object PcmDecoder {
-    private const val CACHE_VERSION = 1
+    private const val CACHE_VERSION = 2
+    private const val TARGET_SAMPLE_RATE = 48000
 
     fun decode(context: Context, key: String, rawResId: Int): ShortArray {
         return readCache(context, key) ?: decodeAndCache(context, key, rawResId)
@@ -101,15 +102,18 @@ object PcmDecoder {
                 val samples = ShortArray(shortBuffer.remaining())
                 shortBuffer.get(samples)
 
-                val monoSamples = if (channels == 2) {
-                    ShortArray(samples.size / 2) { i ->
-                        ((samples[i * 2].toInt() + samples[i * 2 + 1].toInt()) / 2).toShort()
+                val stereoSamples = if (channels == 1) {
+                    ShortArray(samples.size * 2).also { out ->
+                        for (i in samples.indices) {
+                            out[i * 2] = samples[i]
+                            out[i * 2 + 1] = samples[i]
+                        }
                     }
                 } else {
                     samples
                 }
-                chunks.add(monoSamples)
-                totalSamples += monoSamples.size
+                chunks.add(stereoSamples)
+                totalSamples += stereoSamples.size
 
                 codec.releaseOutputBuffer(outputIndex, false)
             }
@@ -126,23 +130,28 @@ object PcmDecoder {
             offset += chunk.size
         }
 
-        if (sampleRate != 44100) {
-            return resample(result, sampleRate, 44100)
+        if (sampleRate != TARGET_SAMPLE_RATE) {
+            return resample(result, sampleRate, TARGET_SAMPLE_RATE)
         }
         return result
     }
 
     private fun resample(input: ShortArray, fromRate: Int, toRate: Int): ShortArray {
         val ratio = fromRate.toDouble() / toRate.toDouble()
-        val outputSize = (input.size / ratio).toInt()
-        val output = ShortArray(outputSize)
-        for (i in output.indices) {
+        val inputFrames = input.size / 2
+        val outputFrames = (inputFrames / ratio).toInt()
+        val output = ShortArray(outputFrames * 2)
+        for (i in 0 until outputFrames) {
             val srcPos = i * ratio
-            val srcIndex = srcPos.toInt()
-            val frac = srcPos - srcIndex
-            val s0 = input[srcIndex].toInt()
-            val s1 = if (srcIndex + 1 < input.size) input[srcIndex + 1].toInt() else s0
-            output[i] = (s0 + (s1 - s0) * frac).toInt().toShort()
+            val srcFrame = srcPos.toInt()
+            val frac = srcPos - srcFrame
+            val nextFrame = if (srcFrame + 1 < inputFrames) srcFrame + 1 else srcFrame
+            val s0L = input[srcFrame * 2].toInt()
+            val s0R = input[srcFrame * 2 + 1].toInt()
+            val s1L = input[nextFrame * 2].toInt()
+            val s1R = input[nextFrame * 2 + 1].toInt()
+            output[i * 2]     = (s0L + (s1L - s0L) * frac).toInt().toShort()
+            output[i * 2 + 1] = (s0R + (s1R - s0R) * frac).toInt().toShort()
         }
         return output
     }

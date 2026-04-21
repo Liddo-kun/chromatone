@@ -27,6 +27,18 @@ class Biquad private constructor(
         }
     }
 
+    fun processInterleaved(buffer: DoubleArray, channel: Int, channelCount: Int) {
+        var i = channel
+        while (i < buffer.size) {
+            val x0 = buffer[i]
+            val y0 = b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
+            x2 = x1; x1 = x0
+            y2 = y1; y1 = y0
+            buffer[i] = y0
+            i += channelCount
+        }
+    }
+
     fun reset() {
         x1 = 0.0; x2 = 0.0; y1 = 0.0; y2 = 0.0
     }

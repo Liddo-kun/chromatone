@@ -32,7 +32,8 @@ class NoiseForegroundService : Service() {
     private var noisePlayer: NoisePlayer? = null
     private var mixBuffer: DoubleArray? = null
     private var resultBuffer: ShortArray? = null
-    private val highPass = Biquad.highPass(40.0, 44100.0)
+    private val highPassL = Biquad.highPass(40.0, 48000.0)
+    private val highPassR = Biquad.highPass(40.0, 48000.0)
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     @Volatile
@@ -65,7 +66,8 @@ class NoiseForegroundService : Service() {
     private fun handlePlay() {
         noisePlayer?.stop()
         NoiseGenerator.reset()
-        highPass.reset()
+        highPassL.reset()
+        highPassR.reset()
         noisePlayer = NoisePlayer { bufferSize ->
             mixNoiseBuffers(bufferSize)
         }
@@ -116,8 +118,8 @@ class NoiseForegroundService : Service() {
         if (noises.isEmpty()) return ShortArray(stereoSize)
 
         var mixed = mixBuffer
-        if (mixed == null || mixed.size != frameCount) {
-            mixed = DoubleArray(frameCount)
+        if (mixed == null || mixed.size != stereoSize) {
+            mixed = DoubleArray(stereoSize)
             mixBuffer = mixed
         } else {
             mixed.fill(0.0)
@@ -125,47 +127,50 @@ class NoiseForegroundService : Service() {
 
         var hasActive = false
 
-        // Mix generated noise
+        // Mix generated noise (stereo interleaved)
         for ((source, volume) in noises) {
             if (source !is GeneratedNoise || volume <= 0f) continue
             hasActive = true
             val scaledVolume = volume.toDouble() * volume.toDouble()
             val buffer = NoiseGenerator.getNoiseBuffer(source.noiseType, frameCount)
-            for (i in mixed.indices) {
+            for (i in 0 until stereoSize) {
                 mixed[i] += buffer[i].toDouble() * scaledVolume
             }
         }
 
-        // Mix ambient PCM loops
+        // Mix ambient PCM loops (stereo interleaved, frame-level position tracking)
         val buffers = pcmBuffers
         for ((source, volume) in noises) {
             if (source !is AmbientSound || volume <= 0f) continue
             val pcm = buffers[source.key] ?: continue
-            if (pcm.isEmpty()) continue
+            if (pcm.size < 2) continue
             hasActive = true
             val scaledVolume = volume.toDouble() * volume.toDouble()
+            val pcmFrames = pcm.size / 2
             var pos = pcmPositions.getOrPut(source.key) { 0 }
-            for (i in mixed.indices) {
-                mixed[i] += pcm[pos].toDouble() * scaledVolume
+            for (i in 0 until frameCount) {
+                mixed[i * 2]     += pcm[pos * 2].toDouble()     * scaledVolume
+                mixed[i * 2 + 1] += pcm[pos * 2 + 1].toDouble() * scaledVolume
                 pos++
-                if (pos >= pcm.size) pos = 0
+                if (pos >= pcmFrames) pos = 0
             }
             pcmPositions[source.key] = pos
         }
 
         if (!hasActive) return ShortArray(stereoSize)
 
-        highPass.processInPlace(mixed)
+        highPassL.processInterleaved(mixed, 0, 2)
+        highPassR.processInterleaved(mixed, 1, 2)
 
         var result = resultBuffer
         if (result == null || result.size != stereoSize) {
             result = ShortArray(stereoSize)
             resultBuffer = result
         }
-        for (i in 0 until frameCount) {
-            val s = (mixed[i] * MASTER_GAIN).coerceIn(Short.MIN_VALUE.toDouble(), Short.MAX_VALUE.toDouble()).toInt().toShort()
-            result[i * 2] = s
-            result[i * 2 + 1] = s
+        for (i in 0 until stereoSize) {
+            result[i] = (mixed[i] * MASTER_GAIN)
+                .coerceIn(Short.MIN_VALUE.toDouble(), Short.MAX_VALUE.toDouble())
+                .toInt().toShort()
         }
         return result
     }

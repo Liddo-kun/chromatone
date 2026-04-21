@@ -17,7 +17,7 @@ class NoisePlayer(private val bufferProvider: (frameCount: Int) -> ShortArray) {
     fun start() {
         if (isPlaying) return
         shouldPlay = true
-        val sampleRate = 44100
+        val sampleRate = 48000
         val minStereoBytes = AudioTrack.getMinBufferSize(
             sampleRate,
             AudioFormat.CHANNEL_OUT_STEREO,
@@ -45,6 +45,7 @@ class NoisePlayer(private val bufferProvider: (frameCount: Int) -> ShortArray) {
             .setAudioFormat(format)
             .setBufferSizeInBytes(minStereoBytes)
             .setTransferMode(AudioTrack.MODE_STREAM)
+            .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_POWER_SAVING)
             .build()
 
         audioTrack?.play()
